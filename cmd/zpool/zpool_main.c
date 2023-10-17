@@ -2088,6 +2088,7 @@ typedef struct status_cbdata {
 	boolean_t	cb_explain;
 	boolean_t	cb_first;
 	boolean_t	cb_dedup_stats;
+	boolean_t	cb_print_unhealthy;
 	boolean_t	cb_print_status;
 	boolean_t	cb_print_slow_ios;
 	boolean_t	cb_print_vdev_init;
@@ -2328,10 +2329,18 @@ print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
 			state = gettext("AVAIL");
 	}
 
+	/* Print columns 1-2: vdev name, state */
+    if (cb->cb_print_unhealthy &&
+        (vs->vs_state == VDEV_STATE_HEALTHY &&
+         ! vs->vs_read_errors &&
+         ! vs->vs_write_errors &&
+         ! vs->vs_checksum_errors ))
+        return;
 	printf_color(health_str_to_color(state),
-	    "\t%*s%-*s  %-8s", depth, "", cb->cb_namewidth - depth,
-	    name, state);
+		"\t%*s%-*s  %-8s", depth, "", cb->cb_namewidth - depth,
+		name, state);
 
+	/* Print columns 3-5 ZFS errs */
 	if (!isspare) {
 		if (vs->vs_read_errors)
 			rcolor = ANSI_RED;
@@ -8959,6 +8968,7 @@ status_callback(zpool_handle_t *zhp, void *data)
  *              [interval [count]]
  *
  *	-c CMD	For each vdev, run command CMD
+ *	-e	Display only unhealthy vdevs
  *	-i	Display vdev initialization status.
  *	-g	Display guid for individual vdev name.
  *	-L	Follow links when resolving vdev path name.
@@ -8984,7 +8994,7 @@ zpool_do_status(int argc, char **argv)
 	char *cmd = NULL;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "c:igLpPsvxDtT:")) != -1) {
+	while ((c = getopt(argc, argv, "c:eigLpPsvxDtT:")) != -1) {
 		switch (c) {
 		case 'c':
 			if (cmd != NULL) {
@@ -9009,6 +9019,9 @@ zpool_do_status(int argc, char **argv)
 				exit(1);
 			}
 			cmd = optarg;
+			break;
+		case 'e':
+			cb.cb_print_unhealthy = B_TRUE;
 			break;
 		case 'i':
 			cb.cb_print_vdev_init = B_TRUE;
