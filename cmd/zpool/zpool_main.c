@@ -8945,9 +8945,11 @@ status_callback(zpool_handle_t *zhp, void *data)
 				(void) printf(gettext(
 				    "errors: No known data errors\n"));
 			} else if (!cbp->cb_verbose) {
+		        color_start(ANSI_RED);
 				(void) printf(gettext("errors: %llu data "
 				    "errors, use '-v' for a list\n"),
 				    (u_longlong_t)nerr);
+                color_end();
 			} else {
 				print_error_log(zhp);
 			}
