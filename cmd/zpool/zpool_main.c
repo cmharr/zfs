@@ -2286,6 +2286,7 @@ health_str_to_color(const char *health)
 
 /*
  * Print out configuration state as requested by status_callback.
+ * If '-e' is specified, only print root and unhealthy vdevs
  */
 static void
 print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
@@ -2329,214 +2330,216 @@ print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
 			state = gettext("AVAIL");
 	}
 
-	/* Print columns 1-2: vdev name, state */
-    if (cb->cb_print_unhealthy &&
-        (vs->vs_state == VDEV_STATE_HEALTHY &&
-         ! vs->vs_read_errors &&
-         ! vs->vs_write_errors &&
-         ! vs->vs_checksum_errors ))
-        return;
-	printf_color(health_str_to_color(state),
-		"\t%*s%-*s  %-8s", depth, "", cb->cb_namewidth - depth,
-		name, state);
+	/* Print columns 1-2, vdev name, state */
+    //printf_color(ANSI_BLUE,"DEBUG %10s %5d %5d %5d %5d %5d %5d",name,depth,vs->vs_state,vs->vs_read_errors,vs->vs_write_errors,vs->vs_checksum_errors);
+    if (! (depth > 0 &&
+        cb->cb_print_unhealthy &&
+        vs->vs_state == VDEV_STATE_HEALTHY &&
+        vs->vs_read_errors == 0 &&
+        vs->vs_write_errors == 0 &&
+        vs->vs_checksum_errors == 0 )) {
 
-	/* Print columns 3-5 ZFS errs */
-	if (!isspare) {
-		if (vs->vs_read_errors)
-			rcolor = ANSI_RED;
+        printf_color(health_str_to_color(state),
+            "\t%*s%-*s  %-8s", depth, "", cb->cb_namewidth - depth,
+            name, state);
 
-		if (vs->vs_write_errors)
-			wcolor = ANSI_RED;
+        /* Print columns 3-5 ZFS errs */
+        if (!isspare) {
+            if (vs->vs_read_errors)
+                rcolor = ANSI_RED;
 
-		if (vs->vs_checksum_errors)
-			ccolor = ANSI_RED;
+            if (vs->vs_write_errors)
+                wcolor = ANSI_RED;
 
-		if (cb->cb_literal) {
-			fputc(' ', stdout);
-			printf_color(rcolor, "%5llu",
-			    (u_longlong_t)vs->vs_read_errors);
-			fputc(' ', stdout);
-			printf_color(wcolor, "%5llu",
-			    (u_longlong_t)vs->vs_write_errors);
-			fputc(' ', stdout);
-			printf_color(ccolor, "%5llu",
-			    (u_longlong_t)vs->vs_checksum_errors);
-		} else {
-			zfs_nicenum(vs->vs_read_errors, rbuf, sizeof (rbuf));
-			zfs_nicenum(vs->vs_write_errors, wbuf, sizeof (wbuf));
-			zfs_nicenum(vs->vs_checksum_errors, cbuf,
-			    sizeof (cbuf));
-			fputc(' ', stdout);
-			printf_color(rcolor, "%5s", rbuf);
-			fputc(' ', stdout);
-			printf_color(wcolor, "%5s", wbuf);
-			fputc(' ', stdout);
-			printf_color(ccolor, "%5s", cbuf);
-		}
-		if (cb->cb_print_slow_ios) {
-			if (children == 0)  {
-				/* Only leafs vdevs have slow IOs */
-				zfs_nicenum(vs->vs_slow_ios, rbuf,
-				    sizeof (rbuf));
-			} else {
-				snprintf(rbuf, sizeof (rbuf), "-");
-			}
+            if (vs->vs_checksum_errors)
+                ccolor = ANSI_RED;
 
-			if (cb->cb_literal)
-				printf(" %5llu", (u_longlong_t)vs->vs_slow_ios);
-			else
-				printf(" %5s", rbuf);
-		}
-	}
+            if (cb->cb_literal) {
+                fputc(' ', stdout);
+                printf_color(rcolor, "%5llu",
+                    (u_longlong_t)vs->vs_read_errors);
+                fputc(' ', stdout);
+                printf_color(wcolor, "%5llu",
+                    (u_longlong_t)vs->vs_write_errors);
+                fputc(' ', stdout);
+                printf_color(ccolor, "%5llu",
+                    (u_longlong_t)vs->vs_checksum_errors);
+            } else {
+                zfs_nicenum(vs->vs_read_errors, rbuf, sizeof (rbuf));
+                zfs_nicenum(vs->vs_write_errors, wbuf, sizeof (wbuf));
+                zfs_nicenum(vs->vs_checksum_errors, cbuf,
+                    sizeof (cbuf));
+                fputc(' ', stdout);
+                printf_color(rcolor, "%5s", rbuf);
+                fputc(' ', stdout);
+                printf_color(wcolor, "%5s", wbuf);
+                fputc(' ', stdout);
+                printf_color(ccolor, "%5s", cbuf);
+            }
+            if (cb->cb_print_slow_ios) {
+                if (children == 0)  {
+                    /* Only leafs vdevs have slow IOs */
+                    zfs_nicenum(vs->vs_slow_ios, rbuf,
+                        sizeof (rbuf));
+                } else {
+                    snprintf(rbuf, sizeof (rbuf), "-");
+                }
 
-	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
-	    &notpresent) == 0) {
-		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
-		(void) printf("  %s %s", gettext("was"), path);
-	} else if (vs->vs_aux != 0) {
-		(void) printf("  ");
-		color_start(ANSI_RED);
-		switch (vs->vs_aux) {
-		case VDEV_AUX_OPEN_FAILED:
-			(void) printf(gettext("cannot open"));
-			break;
+                if (cb->cb_literal)
+                    printf(" %5llu", (u_longlong_t)vs->vs_slow_ios);
+                else
+                    printf(" %5s", rbuf);
+            }
+        }
 
-		case VDEV_AUX_BAD_GUID_SUM:
-			(void) printf(gettext("missing device"));
-			break;
+        if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
+            &notpresent) == 0) {
+            verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
+            (void) printf("  %s %s", gettext("was"), path);
+        } else if (vs->vs_aux != 0) {
+            (void) printf("  ");
+            color_start(ANSI_RED);
+            switch (vs->vs_aux) {
+            case VDEV_AUX_OPEN_FAILED:
+                (void) printf(gettext("cannot open"));
+                break;
 
-		case VDEV_AUX_NO_REPLICAS:
-			(void) printf(gettext("insufficient replicas"));
-			break;
+            case VDEV_AUX_BAD_GUID_SUM:
+                (void) printf(gettext("missing device"));
+                break;
 
-		case VDEV_AUX_VERSION_NEWER:
-			(void) printf(gettext("newer version"));
-			break;
+            case VDEV_AUX_NO_REPLICAS:
+                (void) printf(gettext("insufficient replicas"));
+                break;
 
-		case VDEV_AUX_UNSUP_FEAT:
-			(void) printf(gettext("unsupported feature(s)"));
-			break;
+            case VDEV_AUX_VERSION_NEWER:
+                (void) printf(gettext("newer version"));
+                break;
 
-		case VDEV_AUX_ASHIFT_TOO_BIG:
-			(void) printf(gettext("unsupported minimum blocksize"));
-			break;
+            case VDEV_AUX_UNSUP_FEAT:
+                (void) printf(gettext("unsupported feature(s)"));
+                break;
 
-		case VDEV_AUX_SPARED:
-			verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID,
-			    &spare_cb.cb_guid) == 0);
-			if (zpool_iter(g_zfs, find_spare, &spare_cb) == 1) {
-				if (strcmp(zpool_get_name(spare_cb.cb_zhp),
-				    zpool_get_name(zhp)) == 0)
-					(void) printf(gettext("currently in "
-					    "use"));
-				else
-					(void) printf(gettext("in use by "
-					    "pool '%s'"),
-					    zpool_get_name(spare_cb.cb_zhp));
-				zpool_close(spare_cb.cb_zhp);
-			} else {
-				(void) printf(gettext("currently in use"));
-			}
-			break;
+            case VDEV_AUX_ASHIFT_TOO_BIG:
+                (void) printf(gettext("unsupported minimum blocksize"));
+                break;
 
-		case VDEV_AUX_ERR_EXCEEDED:
-			(void) printf(gettext("too many errors"));
-			break;
+            case VDEV_AUX_SPARED:
+                verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID,
+                    &spare_cb.cb_guid) == 0);
+                if (zpool_iter(g_zfs, find_spare, &spare_cb) == 1) {
+                    if (strcmp(zpool_get_name(spare_cb.cb_zhp),
+                        zpool_get_name(zhp)) == 0)
+                        (void) printf(gettext("currently in "
+                            "use"));
+                    else
+                        (void) printf(gettext("in use by "
+                            "pool '%s'"),
+                            zpool_get_name(spare_cb.cb_zhp));
+                    zpool_close(spare_cb.cb_zhp);
+                } else {
+                    (void) printf(gettext("currently in use"));
+                }
+                break;
 
-		case VDEV_AUX_IO_FAILURE:
-			(void) printf(gettext("experienced I/O failures"));
-			break;
+            case VDEV_AUX_ERR_EXCEEDED:
+                (void) printf(gettext("too many errors"));
+                break;
 
-		case VDEV_AUX_BAD_LOG:
-			(void) printf(gettext("bad intent log"));
-			break;
+            case VDEV_AUX_IO_FAILURE:
+                (void) printf(gettext("experienced I/O failures"));
+                break;
 
-		case VDEV_AUX_EXTERNAL:
-			(void) printf(gettext("external device fault"));
-			break;
+            case VDEV_AUX_BAD_LOG:
+                (void) printf(gettext("bad intent log"));
+                break;
 
-		case VDEV_AUX_SPLIT_POOL:
-			(void) printf(gettext("split into new pool"));
-			break;
+            case VDEV_AUX_EXTERNAL:
+                (void) printf(gettext("external device fault"));
+                break;
 
-		case VDEV_AUX_ACTIVE:
-			(void) printf(gettext("currently in use"));
-			break;
+            case VDEV_AUX_SPLIT_POOL:
+                (void) printf(gettext("split into new pool"));
+                break;
 
-		case VDEV_AUX_CHILDREN_OFFLINE:
-			(void) printf(gettext("all children offline"));
-			break;
+            case VDEV_AUX_ACTIVE:
+                (void) printf(gettext("currently in use"));
+                break;
 
-		case VDEV_AUX_BAD_LABEL:
-			(void) printf(gettext("invalid label"));
-			break;
+            case VDEV_AUX_CHILDREN_OFFLINE:
+                (void) printf(gettext("all children offline"));
+                break;
 
-		default:
-			(void) printf(gettext("corrupted data"));
-			break;
-		}
-		color_end();
-	} else if (children == 0 && !isspare &&
-	    getenv("ZPOOL_STATUS_NON_NATIVE_ASHIFT_IGNORE") == NULL &&
-	    VDEV_STAT_VALID(vs_physical_ashift, vsc) &&
-	    vs->vs_configured_ashift < vs->vs_physical_ashift) {
-		(void) printf(
-		    gettext("  block size: %dB configured, %dB native"),
-		    1 << vs->vs_configured_ashift, 1 << vs->vs_physical_ashift);
-	}
+            case VDEV_AUX_BAD_LABEL:
+                (void) printf(gettext("invalid label"));
+                break;
 
-	if (vs->vs_scan_removing != 0) {
-		(void) printf(gettext("  (removing)"));
-	} else if (VDEV_STAT_VALID(vs_noalloc, vsc) && vs->vs_noalloc != 0) {
-		(void) printf(gettext("  (non-allocating)"));
-	}
+            default:
+                (void) printf(gettext("corrupted data"));
+                break;
+            }
+            color_end();
+        } else if (children == 0 && !isspare &&
+            getenv("ZPOOL_STATUS_NON_NATIVE_ASHIFT_IGNORE") == NULL &&
+            VDEV_STAT_VALID(vs_physical_ashift, vsc) &&
+            vs->vs_configured_ashift < vs->vs_physical_ashift) {
+            (void) printf(
+                gettext("  block size: %dB configured, %dB native"),
+                1 << vs->vs_configured_ashift, 1 << vs->vs_physical_ashift);
+        }
 
-	/* The root vdev has the scrub/resilver stats */
-	root = fnvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
-	    ZPOOL_CONFIG_VDEV_TREE);
-	(void) nvlist_lookup_uint64_array(root, ZPOOL_CONFIG_SCAN_STATS,
-	    (uint64_t **)&ps, &c);
+        if (vs->vs_scan_removing != 0) {
+            (void) printf(gettext("  (removing)"));
+        } else if (VDEV_STAT_VALID(vs_noalloc, vsc) && vs->vs_noalloc != 0) {
+            (void) printf(gettext("  (non-allocating)"));
+        }
 
-	/*
-	 * If you force fault a drive that's resilvering, its scan stats can
-	 * get frozen in time, giving the false impression that it's
-	 * being resilvered.  That's why we check the state to see if the vdev
-	 * is healthy before reporting "resilvering" or "repairing".
-	 */
-	if (ps != NULL && ps->pss_state == DSS_SCANNING && children == 0 &&
-	    vs->vs_state == VDEV_STATE_HEALTHY) {
-		if (vs->vs_scan_processed != 0) {
-			(void) printf(gettext("  (%s)"),
-			    (ps->pss_func == POOL_SCAN_RESILVER) ?
-			    "resilvering" : "repairing");
-		} else if (vs->vs_resilver_deferred) {
-			(void) printf(gettext("  (awaiting resilver)"));
-		}
-	}
+        /* The root vdev has the scrub/resilver stats */
+        root = fnvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
+            ZPOOL_CONFIG_VDEV_TREE);
+        (void) nvlist_lookup_uint64_array(root, ZPOOL_CONFIG_SCAN_STATS,
+            (uint64_t **)&ps, &c);
 
-	/* The top-level vdevs have the rebuild stats */
-	if (vrs != NULL && vrs->vrs_state == VDEV_REBUILD_ACTIVE &&
-	    children == 0 && vs->vs_state == VDEV_STATE_HEALTHY) {
-		if (vs->vs_rebuild_processed != 0) {
-			(void) printf(gettext("  (resilvering)"));
-		}
-	}
+        /*
+         * If you force fault a drive that's resilvering, its scan stats can
+         * get frozen in time, giving the false impression that it's
+         * being resilvered.  That's why we check the state to see if the vdev
+         * is healthy before reporting "resilvering" or "repairing".
+         */
+        if (ps != NULL && ps->pss_state == DSS_SCANNING && children == 0 &&
+            vs->vs_state == VDEV_STATE_HEALTHY) {
+            if (vs->vs_scan_processed != 0) {
+                (void) printf(gettext("  (%s)"),
+                    (ps->pss_func == POOL_SCAN_RESILVER) ?
+                    "resilvering" : "repairing");
+            } else if (vs->vs_resilver_deferred) {
+                (void) printf(gettext("  (awaiting resilver)"));
+            }
+        }
 
-	if (cb->vcdl != NULL) {
-		if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
-			printf("  ");
-			zpool_print_cmd(cb->vcdl, zpool_get_name(zhp), path);
-		}
-	}
+        /* The top-level vdevs have the rebuild stats */
+        if (vrs != NULL && vrs->vrs_state == VDEV_REBUILD_ACTIVE &&
+            children == 0 && vs->vs_state == VDEV_STATE_HEALTHY) {
+            if (vs->vs_rebuild_processed != 0) {
+                (void) printf(gettext("  (resilvering)"));
+            }
+        }
 
-	/* Display vdev initialization and trim status for leaves. */
-	if (children == 0) {
-		print_status_initialize(vs, cb->cb_print_vdev_init);
-		print_status_trim(vs, cb->cb_print_vdev_trim);
-	}
+        if (cb->vcdl != NULL) {
+            if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
+                printf("  ");
+                zpool_print_cmd(cb->vcdl, zpool_get_name(zhp), path);
+            }
+        }
 
-	(void) printf("\n");
+        /* Display vdev initialization and trim status for leaves. */
+        if (children == 0) {
+            print_status_initialize(vs, cb->cb_print_vdev_init);
+            print_status_trim(vs, cb->cb_print_vdev_trim);
+        }
 
+        (void) printf("\n");
+    }
 	for (c = 0; c < children; c++) {
 		uint64_t islog = B_FALSE, ishole = B_FALSE;
 
