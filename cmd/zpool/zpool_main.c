@@ -2285,6 +2285,33 @@ health_str_to_color(const char *health)
 }
 
 /*
+ * If printing out only unhealthy vdevs, then loop through children so that
+ * if any of them are unhealthy, we print our own line as a parent.
+ */ 
+static bool
+check_child_health(const char *name, nvlist_t *nv)
+{
+    /* Loop through children and return true on first error found */
+    uint_t c, children, vsc;
+    vdev_stat_t *vs;
+
+    /*
+ *  for child in num_children; do
+ *      if child->vs->errors > 0
+ *          return true
+ */
+	for (c = 0; c < children; c++) {
+    /* What do we need to iterate here? Need to grab the VS for the NV and return if nonzero */
+        verify(nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
+            (uint64_t **)&vs, &vsc) == 0);
+        if (vs->vs_checksum_errors || vs->vs_read_errors || vs->vs_write_errors)
+            return true
+    }
+    return false
+}
+
+
+/*
  * Print out configuration state as requested by status_callback.
  * If '-e' is specified, only print root and unhealthy vdevs
  */
@@ -2331,7 +2358,9 @@ print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
 	}
 
 	/* Print columns 1-2, vdev name, state */
-    //printf_color(ANSI_BLUE,"DEBUG %10s %5d %5d %5d %5d %5d %5d",name,depth,vs->vs_state,vs->vs_read_errors,vs->vs_write_errors,vs->vs_checksum_errors);
+    printf_color(ANSI_BLUE,"DEBUG %7s %5d %5d %5d %5d %5d %5d %5d",name,depth,children,vs->vs_state,vs->vs_read_errors,vs->vs_write_errors,vs->vs_checksum_errors);
+    if (cb->cb_print_unhealthy)
+	    (void) printf("\n");
     if (! (depth > 0 &&
         cb->cb_print_unhealthy &&
         vs->vs_state == VDEV_STATE_HEALTHY &&
