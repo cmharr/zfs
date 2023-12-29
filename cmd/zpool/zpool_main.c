@@ -2288,11 +2288,11 @@ health_str_to_color(const char *health)
  * If printing out only unhealthy vdevs, then loop through children so that
  * if any of them are unhealthy, we print our own line as a parent.
  */ 
-static bool
-check_child_health(const char *name, nvlist_t *nv)
+static boolean_t
+check_child_health(const char *name, nvlist_t *nv, uint_t children)
 {
     /* Loop through children and return true on first error found */
-    uint_t c, children, vsc;
+    uint_t c, vsc;
     vdev_stat_t *vs;
 
     /*
@@ -2301,13 +2301,14 @@ check_child_health(const char *name, nvlist_t *nv)
  *          return true
  */
 	for (c = 0; c < children; c++) {
-    /* What do we need to iterate here? Need to grab the VS for the NV and return if nonzero */
+    /* Need to grab vs info for nv->child(?) here and check for errors */
         verify(nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
             (uint64_t **)&vs, &vsc) == 0);
+        printf_color(ANSI_BLUE,"DEBUG %7s %5d %5d %5llu %5llu %5llu\n",name,c,children,(u_longlong_t)vs->vs_read_errors,(u_longlong_t)vs->vs_write_errors,(u_longlong_t)vs->vs_checksum_errors);
         if (vs->vs_checksum_errors || vs->vs_read_errors || vs->vs_write_errors)
-            return true
+            return (B_TRUE);
     }
-    return false
+    return (B_FALSE);
 }
 
 
@@ -2358,9 +2359,16 @@ print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
 	}
 
 	/* Print columns 1-2, vdev name, state */
-    printf_color(ANSI_BLUE,"DEBUG %7s %5d %5d %5d %5d %5d %5d %5d",name,depth,children,vs->vs_state,vs->vs_read_errors,vs->vs_write_errors,vs->vs_checksum_errors);
+    //printf_color(ANSI_BLUE,"DEBUG %7s %5d %5d %5d %5llu %5llu %5llu",name,depth,children,vs->vs_state,(u_longlong_t)vs->vs_read_errors,(u_longlong_t)vs->vs_write_errors,(u_longlong_t)vs->vs_checksum_errors);
     if (cb->cb_print_unhealthy)
-	    (void) printf("\n");
+        if ( children > 0 ) {
+            /* If check_child_health() returns true, a child is unhealthy */
+	        if (check_child_health(name,nv,children))
+                printf_color(health_str_to_color(state),
+                    "\t%*s%-*s  %-8s", depth, "", cb->cb_namewidth - depth,
+                    name, state);
+            
+        }
     if (! (depth > 0 &&
         cb->cb_print_unhealthy &&
         vs->vs_state == VDEV_STATE_HEALTHY &&
