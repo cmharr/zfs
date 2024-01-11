@@ -2304,7 +2304,6 @@ check_child_health(const char *name, nvlist_t *nv, uint_t children)
     /* Need to grab vs info for nv->child(?) here and check for errors */
         verify(nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
             (uint64_t **)&vs, &vsc) == 0);
-        printf_color(ANSI_BLUE,"DEBUG %7s %5d %5d %5llu %5llu %5llu\n",name,c,children,(u_longlong_t)vs->vs_read_errors,(u_longlong_t)vs->vs_write_errors,(u_longlong_t)vs->vs_checksum_errors);
         if (vs->vs_checksum_errors || vs->vs_read_errors || vs->vs_write_errors)
             return (B_TRUE);
     }
@@ -2359,7 +2358,6 @@ print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
 	}
 
 	/* Print columns 1-2, vdev name, state */
-    //printf_color(ANSI_BLUE,"DEBUG %7s %5d %5d %5d %5llu %5llu %5llu",name,depth,children,vs->vs_state,(u_longlong_t)vs->vs_read_errors,(u_longlong_t)vs->vs_write_errors,(u_longlong_t)vs->vs_checksum_errors);
     if (cb->cb_print_unhealthy)
         if ( children > 0 ) {
             /* If check_child_health() returns true, a child is unhealthy */
